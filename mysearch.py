@@ -3,7 +3,7 @@ import requests
 import time
 import threading
 import re
-
+import base64
 
 class CourseSearcher():
 
@@ -11,6 +11,7 @@ class CourseSearcher():
         self.cookies = dict()
         self.cookies_file = 'cookies.txt'
         self.lessons_file = 'lessons.txt'
+        self.info_file = 'info.txt'
         self.url = 'https://xk.fudan.edu.cn/xk/stdElectCourse!queryLesson.action?profileId=1527'
         self.lessonNo_list = list()
         self.form_data={
@@ -62,10 +63,66 @@ class CourseSearcher():
         ret = re.findall(r"""%s':{sc:([\d]+?),lc:([\d]+?)}"""%id_name[0],response.splitlines()[1])[0]
         if(int(ret[0])<int(ret[1])):
             print("课程序号为%s的%s，当前%s/%s，可选"%(lessonNo,id_name[1],ret[0],ret[1]))
+            print("----------- 正在尝试选课中 --------------")
+            self.frequent_course_request(id_name[0])
         else:
             print("课程序号为%s的%s，当前%s/%s，不可选"%(lessonNo,id_name[1],ret[0],ret[1]))
-        
-        
+
+    # 抢课（捡漏）
+    def frequent_course_request(self, course_id):
+        form_data = {
+            'optype': 'true',
+            'operator0': str(course_id) + ':true:0',
+            'captcha_response': self.get_captcha()
+        }
+        self.select_course(form_data)
+
+    def select_course(self, form_data):
+        try:
+            response = self.session.post(
+                url='https://xk.fudan.edu.cn/xk/stdElectCourse!batchOperator.action?profileId=1527',
+                data=form_data,
+                timeout=5
+            )
+            response = response.content.decode(encoding='utf-8')
+            if(response.find('成功') != -1):
+                print("选课成功")
+            elif(response.find('已经选过') != -1):
+                print("选课失败:你已经选过这门课了")
+            elif(response.find('验证码')):
+                print('选课失败:验证码错误')
+        except:
+            print("选课出错，请检查")
+
+    def get_captcha(self):
+        try:
+            response = self.session.get(
+                url='https://xk.fudan.edu.cn/xk/captcha/image.action',
+                timeout=5
+            )
+            img_b64 = base64.b64encode(response.content).decode()
+            # get captcha from remote api
+            captcha = self.remote_captcha_identify(img_b64)
+            return captcha
+        except:
+            print("获取验证码失败")
+    
+    def remote_captcha_identify(self, base64):
+        with open(self.info_file, 'r', encoding = 'utf-8') as f:
+            info_list = f.read().splitlines()
+        data = {
+            'image' : base64,
+            'username' : info_list[0],
+            'password' : info_list[1],
+            'typeid' : 3
+        }
+        result = json.loads(requests.post("http://api.ttshitu.com/base64", json=data).text)
+        if result['success']:
+            return result["data"]["result"]
+        else:
+            print(result["message"])
+            return ""
+            
 if __name__ == "__main__":
     s = CourseSearcher()
     m = s.search()
