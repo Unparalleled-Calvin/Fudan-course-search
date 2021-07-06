@@ -1,0 +1,2 @@
+https://xk.fudan.edu.cn/xk/stdElectCourse!queryLesson.action?profileId=1609
+https://xk.fudan.edu.cn/xk/stdElectCourse!batchOperator.action?profileId=1609

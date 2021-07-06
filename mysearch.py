@@ -12,12 +12,14 @@ class CourseSearcher():
         self.cookies_file = 'cookies.txt'
         self.lessons_file = 'lessons.txt'
         self.info_file = 'info.txt'
-        self.url = 'https://xk.fudan.edu.cn/xk/stdElectCourse!queryLesson.action?profileId=1527'
+        self.urls_file = 'urls.txt'
+        with open(r"urls.txt", "r") as f:
+            [self.qurl, self.curl] = f.read().splitlines()[0:2]
         self.lessonNo_list = list()
         self.form_data={
             'lessonNo': '' ,
             'courseCode': '',
-            'courseName': '',
+            'courseName': '分布式',
         }
 
     def read_lessons(self):
@@ -44,19 +46,19 @@ class CourseSearcher():
         self.session.cookies = self.read_cookies()
         while True:
             for lessonNo in self.lessonNo_list:
-                time.sleep(1.5)
+                time.sleep(0.1)
                 self.form_data['lessonNo'] = lessonNo
-                try:
-                    response = self.session.post(
-                            self.url,
-                            data = self.form_data,
-                            timeout = 5
-                    )
-                    response = response.content.decode()
-                    self.is_course_available(response,lessonNo)
-                except:
-                    print('cookies错误，请尝试更改cookies，并重新运行')
-                    continue
+                # try:
+                response = self.session.post(
+                        self.qurl,
+                        data = self.form_data,
+                        timeout = 5
+                )
+                response = response.content.decode()
+                self.is_course_available(response,lessonNo)
+                # except Exception as e:
+                #     print('cookies错误，请尝试更改cookies，并重新运行')
+                #     continue
 
     def is_course_available(self,response,lessonNo):
         id_name = re.findall(r"""{id:([\d]+?),no:["']%s["'],name:["'](.+?)['"],"""%lessonNo,response)[0]
@@ -80,7 +82,7 @@ class CourseSearcher():
     def select_course(self, form_data):
         try:
             response = self.session.post(
-                url='https://xk.fudan.edu.cn/xk/stdElectCourse!batchOperator.action?profileId=1527',
+                url=self.curl,
                 data=form_data,
                 timeout=5
             )
@@ -89,9 +91,12 @@ class CourseSearcher():
                 print("选课成功")
             elif(response.find('已经选过') != -1):
                 print("选课失败:你已经选过这门课了")
-            elif(response.find('验证码')):
+            elif(response.find('不开放') != -1):
+                print("选课失败:当前选课不开放")
+            elif(response.find('验证码') != -1):
                 print('选课失败:验证码错误')
-        except:
+        except Exception as e:
+            print(e)
             print("选课出错，请检查")
 
     def get_captcha(self):
